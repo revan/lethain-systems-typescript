@@ -1,0 +1,47 @@
+{
+  "name": "systems",
+  "version": "0.1.0",
+  "description": "TypeScript port of lethain/systems: describe and run stocks-and-flows systems models.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=26"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "bin": {
+    "systems-run": "./dist/cli/run.js",
+    "systems-viz": "./dist/cli/viz.js",
+    "systems-fmt": "./dist/cli/fmt.js",
+    "systems-lex": "./dist/cli/lex.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "parity": "npm run build && vitest run -c vitest.parity.config.ts",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.6",
+    "eslint": "^10.15.0",
+    "husky": "^9.1.7",
+    "tsup": "^9.0.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.73.0",
+    "vitest": "^5.1.1"
+  }
+}
