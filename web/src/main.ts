@@ -10,6 +10,7 @@ import {
   type ChartDataset,
 } from "chart.js";
 import { parse, type Model, type Snapshot } from "systems";
+import { decodeState, encodeState, PARAM, type PageState, type Tab } from "./share";
 import "./style.css";
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Legend, Tooltip);
@@ -26,7 +27,7 @@ const exampleNames = Object.keys(EXAMPLES)
 const exampleText = (name: string): string => EXAMPLES[`../../examples/${name}.txt`] ?? "";
 
 const DEFAULT_MODEL = exampleText("hiring");
-const STORAGE_KEY = "systems-playground:model";
+const STORAGE_KEY = "systems-playground:state";
 const MAX_ROUNDS = 10000;
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -156,6 +157,7 @@ function renderCheckboxes(): void {
         if (box.checked) hidden.delete(name);
         else hidden.add(name);
         renderOutput();
+        persist();
       });
       const swatch = document.createElement("span");
       swatch.className = "swatch";
@@ -261,7 +263,7 @@ function renderTable(): void {
   tableEl.replaceChildren(thead, tbody);
 }
 
-let activeTab: "chart" | "table" = "chart";
+let activeTab: Tab = "chart";
 
 function renderOutput(): void {
   if (activeTab === "chart") renderChart();
@@ -278,25 +280,63 @@ function debounce(fn: () => void, ms: number): () => void {
   };
 }
 
-function saveModel(): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, modelInput.value);
-  } catch {
-    // Storage may be unavailable (private mode); the page works without it.
-  }
+function currentState(): PageState {
+  const cols = new Set(lastGood?.columns ?? []);
+  return {
+    model: modelInput.value,
+    rounds: roundsInput.value,
+    // Only stocks in the current model; stale names would just bloat the URL.
+    hidden: [...hidden].filter((h) => cols.has(h)),
+    tab: activeTab,
+  };
 }
 
-function loadModel(): string {
+let persistSeq = 0;
+
+/** Mirror the page state into the `?s=` URL parameter and localStorage. */
+const persist = debounce(() => {
+  const seq = ++persistSeq;
+  void encodeState(currentState()).then((encoded) => {
+    if (seq !== persistSeq) return; // a newer state is already being written
+    const url = new URL(location.href);
+    url.searchParams.set(PARAM, encoded);
+    history.replaceState(null, "", url);
+    try {
+      localStorage.setItem(STORAGE_KEY, encoded);
+    } catch {
+      // Storage may be unavailable (private mode); the URL still carries the state.
+    }
+  });
+}, 300);
+
+/** State from the URL if present, else from the last visit, else the default example. */
+async function initialState(): Promise<PageState> {
+  const fromUrl = new URL(location.href).searchParams.get(PARAM);
+  let stored: string | null = null;
   try {
-    return localStorage.getItem(STORAGE_KEY) ?? DEFAULT_MODEL;
+    stored = localStorage.getItem(STORAGE_KEY);
   } catch {
-    return DEFAULT_MODEL;
+    // ignore
+  }
+  for (const encoded of [fromUrl, stored]) {
+    if (!encoded) continue;
+    const state = await decodeState(encoded);
+    if (state) return state;
+  }
+  return { model: DEFAULT_MODEL, rounds: "100", hidden: [], tab: "chart" };
+}
+
+function setTab(tab: Tab): void {
+  activeTab = tab;
+  for (const t of ["chart", "table"] as const) {
+    $(`tab-${t}`).setAttribute("aria-selected", String(t === tab));
+    $(`view-${t}`).hidden = t !== tab;
   }
 }
 
 const update = debounce(() => {
   evaluate();
-  saveModel();
+  persist();
 }, 150);
 
 modelInput.addEventListener("input", update);
@@ -323,28 +363,27 @@ exampleSelect.addEventListener("change", () => {
   exampleSelect.value = "";
   hidden.clear();
   evaluate();
-  saveModel();
+  persist();
 });
 
 $("select-all").addEventListener("click", () => {
   hidden.clear();
   renderCheckboxes();
   renderOutput();
+  persist();
 });
 $("select-none").addEventListener("click", () => {
   for (const c of lastGood?.columns ?? []) hidden.add(c);
   renderCheckboxes();
   renderOutput();
+  persist();
 });
 
 for (const tab of ["chart", "table"] as const) {
   $(`tab-${tab}`).addEventListener("click", () => {
-    activeTab = tab;
-    for (const t of ["chart", "table"] as const) {
-      $(`tab-${t}`).setAttribute("aria-selected", String(t === tab));
-      $(`view-${t}`).hidden = t !== tab;
-    }
+    setTab(tab);
     renderOutput();
+    persist();
   });
 }
 
@@ -355,5 +394,27 @@ darkQuery.addEventListener("change", () => {
   renderOutput();
 });
 
-modelInput.value = loadModel();
+const copyButton = $<HTMLButtonElement>("copy-link");
+copyButton.addEventListener("click", () => {
+  void encodeState(currentState()).then(async (encoded) => {
+    const url = new URL(location.href);
+    url.searchParams.set(PARAM, encoded);
+    history.replaceState(null, "", url);
+    try {
+      await navigator.clipboard.writeText(url.href);
+      copyButton.textContent = "Copied";
+    } catch {
+      copyButton.textContent = "Copy failed";
+    }
+    setTimeout(() => (copyButton.textContent = "Copy link"), 1500);
+  });
+});
+
+const initial = await initialState();
+modelInput.value = initial.model;
+roundsInput.value = initial.rounds;
+for (const h of initial.hidden) hidden.add(h);
+setTab(initial.tab);
 evaluate();
+// Write the URL right away, so the address bar is shareable from the start.
+persist();

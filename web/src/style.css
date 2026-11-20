@@ -314,3 +314,15 @@ th:first-child {
     min-height: 320px;
   }
 }
+
+.copy-link {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.copy-link:hover {
+  border-color: var(--accent);
+}
