@@ -24,6 +24,14 @@ node dist/cli/run.js -r 10 [--csv] < examples/hiring.txt
 
 `systems-viz`, `systems-fmt` and `systems-lex` work the same way.
 
+`web/` is a Vite playground (live model editor + Chart.js chart) that depends on this package via `file:..`. Build the library first, then:
+
+```bash
+cd web && npm install && npm run dev    # http://localhost:5173
+```
+
+`.github/workflows/pages.yml` builds it and deploys `web/dist` to GitHub Pages on every push to `main`.
+
 ## Layout
 
 | Upstream Python | Port | Notes |

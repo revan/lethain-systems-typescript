@@ -1,0 +1,19 @@
+{
+  "name": "systems-playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "chart.js": "^4.6.1",
+    "systems": "file:.."
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^8.3.8"
+  }
+}
